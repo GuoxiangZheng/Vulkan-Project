@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <cstdlib>
 #include <vector>
+#include <optional>
 
 const unsigned int WIDTH = 800;
 const unsigned int  HEIGHT = 600;
@@ -20,7 +21,8 @@ const bool enableValidationLayers = true;
 
 struct QueueFamilyIndices
 {
-    unsigned graphicsFamily;
+    std::optional<unsigned> graphicsFamily;
+    bool isComplete() const { return graphicsFamily.has_value(); }
 };
 
 #pragma region VULKAN DEBUG HELPER FUNCTIONS
@@ -62,6 +64,7 @@ static void DestroyDebugUtilsMessengerEXT(
 #pragma endregion
 
 #pragma region HELPER FUNCTIONS
+
 static std::vector<const char*> getRequiredExtensions()
 {
     unsigned int glfwExtensionCount = 0;
@@ -176,9 +179,34 @@ static void setupDebugMessenger(VkInstance* instance, VkDebugUtilsMessengerEXT* 
         throw std::runtime_error("failed to set up the debug messenger");
 }
 
+static QueueFamilyIndices findQueueFamily(VkPhysicalDevice device)
+{
+    QueueFamilyIndices idx;
+
+    unsigned queueFamilyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+    unsigned i = 0;
+    for (const auto& queueFamily : queueFamilies)
+    {
+        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+            idx.graphicsFamily = i;
+
+        if (idx.isComplete())
+            break;
+
+        i++;
+    }
+
+    return idx;
+}
+
 static bool isDeviceSuitable(VkPhysicalDevice device)
 {
-    // Checks for a dedicated graphics card that support geometry shader
+    // Checks for a dedicated graphics card that support geometry shaders
     /*VkPhysicalDeviceProperties deviceProperties;
     VkPhysicalDeviceFeatures deviceFeatures;
     vkGetPhysicalDeviceProperties(device, &deviceProperties);
@@ -187,7 +215,9 @@ static bool isDeviceSuitable(VkPhysicalDevice device)
     return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && deviceFeatures.geometryShader;*/
 
     // For now, just use the first GPU that it encounters
-    return true;
+    QueueFamilyIndices idx = findQueueFamily(device);
+
+    return idx.isComplete();
 }
 
 static void pickPhysicalDevice(VkPhysicalDevice* phyDevice, VkInstance* instance)
@@ -216,7 +246,34 @@ static void pickPhysicalDevice(VkPhysicalDevice* phyDevice, VkInstance* instance
         throw std::runtime_error("failed to find a suitable GPU!");
 }
 
+static void createLogicalDevice(VkPhysicalDevice phyDevice, VkDevice* device, VkPhysicalDeviceFeatures* deviceFeatures, VkQueue* queue)
+{
+    QueueFamilyIndices idx = findQueueFamily(phyDevice);
 
+    // Information about the queues
+    VkDeviceQueueCreateInfo createQInfo{};
+    createQInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    createQInfo.queueFamilyIndex = idx.graphicsFamily.value();
+    createQInfo.queueCount = 1;
+    float queuePriorirty = 1.f;
+    createQInfo.pQueuePriorities = &queuePriorirty;
+
+    // Information about the device/GPU
+    VkDeviceCreateInfo createDevInfo{};
+    createDevInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createDevInfo.pQueueCreateInfos = &createQInfo;
+    createDevInfo.queueCreateInfoCount = 1;
+    createDevInfo.pEnabledFeatures = deviceFeatures;
+    createDevInfo.enabledExtensionCount = 0;
+
+    // Create the logical device
+    if (vkCreateDevice(phyDevice, &createDevInfo, nullptr, device) != VK_SUCCESS)
+        throw std::runtime_error("failed to create logical device!");
+
+    // Get the handle for the graphics queue. The 0 is the queue index, if there is more than one, 
+    // we need to pass the corresponding indices
+    vkGetDeviceQueue(*device, idx.graphicsFamily.value(), 0, queue);
+}
 
 #pragma endregion
 
@@ -235,7 +292,10 @@ private:
     GLFWwindow* window = nullptr;
     VkInstance instance{};
     VkDebugUtilsMessengerEXT debugMessenger{};
-    VkPhysicalDevice device = VK_NULL_HANDLE;
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    VkPhysicalDeviceFeatures deviceFeatures{};
+    VkDevice device{};
+    VkQueue graphicsQueue{};
 };
 
 void HelloTriangleApplication::run()
@@ -263,7 +323,8 @@ void HelloTriangleApplication::initVulkan()
 {
     createInstance(&instance);
     setupDebugMessenger(&instance, &debugMessenger);
-    pickPhysicalDevice(&device, &instance);
+    pickPhysicalDevice(&physicalDevice, &instance);
+    createLogicalDevice(physicalDevice, &device, &deviceFeatures, &graphicsQueue);
 }
 
 void HelloTriangleApplication::mainLoop()
@@ -279,6 +340,7 @@ void HelloTriangleApplication::cleanup()
     if (enableValidationLayers)
         DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 
+    vkDestroyDevice(device, nullptr);
     vkDestroyInstance(instance, nullptr);
     glfwDestroyWindow(window);
     glfwTerminate();
