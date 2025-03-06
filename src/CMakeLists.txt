@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.8)
 project(VkProj)
 
 # Engine library
-add_executable(${PROJECT_NAME} main.cpp)
+add_executable(${PROJECT_NAME} main.cpp "VulkanSetUp.h" "VulkanSetUp.cpp")
 target_include_directories(${PROJECT_NAME} PUBLIC .)
 
 # GLM
