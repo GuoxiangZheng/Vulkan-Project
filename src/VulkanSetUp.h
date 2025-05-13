@@ -49,6 +49,7 @@ public:
     void createInstance(const bool& enableLayer);
     void createSwapChain();
     void createImageViews();
+    void createGraphicsPipeline();
 
     void destroyDebugMessenger() const;
     void cleanup();
@@ -64,6 +65,7 @@ private:
     VkSurfaceFormatKHR chooseSwapChainSurfaceFormat(const SwapChainSupportDetails& details);
     VkPresentModeKHR chooseSwapPresentMode(const SwapChainSupportDetails& details);
     VkExtent2D chooseSwapExtent(const SwapChainSupportDetails& details);
+    VkShaderModule createShaderModule(const std::vector<char>& code);
 
     SwapChainSupportDetails querySwapChainSupport(const VkPhysicalDevice device) const;
     QueueFamilyIndices findQueueFamily(const VkPhysicalDevice& device) const;
@@ -78,8 +80,10 @@ private:
     VkQueue presentQueue{};
     VkSurfaceKHR surface{};
     VkSwapchainKHR swapChain{};
-    VkExtent2D extent{};
+    VkExtent2D mExtent{};
     VkFormat format{};
+    VkShaderModule vShadMod{};
+    VkShaderModule fShadMod{};
     std::vector<VkImage> swapChainImages;
     std::vector<VkImageView> SCImageView;
 };

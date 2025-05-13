@@ -46,6 +46,7 @@ void HelloTriangleApplication::initVulkan()
     mSetUp.pickPhysicalDevice();
     mSetUp.createLogicalDevice();
     mSetUp.createSwapChain();
+    mSetUp.createImageViews();
 }
 
 void HelloTriangleApplication::mainLoop()

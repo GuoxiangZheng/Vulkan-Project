@@ -1,4 +1,5 @@
 #include "VulkanSetUp.h"
+#include <fstream>
 
 #pragma region VULKAN DEBUG HELPER FUNCTIONS
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -220,6 +221,20 @@ VkExtent2D VKSetUp::chooseSwapExtent(const SwapChainSupportDetails& details)
     return actualExtent;
 }
 
+VkShaderModule VKSetUp::createShaderModule(const std::vector<char>& code)
+{
+    VkShaderModuleCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.codeSize = code.size();
+    createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+    VkShaderModule shadModule;
+    if (vkCreateShaderModule(device, &createInfo, nullptr, &shadModule) != VK_SUCCESS)
+        throw std::runtime_error("failed to create shader module!");
+
+    return shadModule;
+}
+
 void VKSetUp::createLogicalDevice()
 {
     QueueFamilyIndices idx = findQueueFamily(physicalDevice);
@@ -365,7 +380,7 @@ void VKSetUp::createSwapChain()
     vkGetSwapchainImagesKHR(device, swapChain, &imgCount, swapChainImages.data());
 
     // Get the extent and format
-    extent = extent;
+    mExtent = extent;
     format = surfaceFormat.format;
 }
 
@@ -441,21 +456,73 @@ void VKSetUp::createImageViews()
     int size = static_cast<int>(swapChainImages.size());
     for (int i = 0; i < size; i++)
     {
-        VkImageViewCreateInfo createInfo;
+        VkImageViewCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         createInfo.image = swapChainImages[i];
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // The type of texture that it will be storing the data (1D, 2D or 3D textures)
         createInfo.format = format;
-        createInfo.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY , VK_COMPONENT_SWIZZLE_IDENTITY , VK_COMPONENT_SWIZZLE_IDENTITY };
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+        // The type of texture that it will output to the window (all colors, black & white, ...)
+        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; 
         createInfo.subresourceRange.baseMipLevel = 0;
         createInfo.subresourceRange.levelCount = 1;
         createInfo.subresourceRange.baseArrayLayer = 0;
         createInfo.subresourceRange.layerCount = 1;
 
-        if (vkCreateImageView(device, &createInfo, nullptr, &SCImageView[i]) != VK_SUCCESS)
+        if (vkCreateImageView(device, &createInfo, nullptr, &SCImageView.at(i)) != VK_SUCCESS)
             throw std::runtime_error("Failed to create image views! (a.k.a textures)");
     }
+}
+
+static std::vector<char> readFile(const std::string& filename)
+{
+    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+    if (!file.is_open())
+        throw std::runtime_error("failed to open file!");
+
+    size_t fileSize = static_cast<size_t>(file.tellg());
+    std::vector<char> buffer(fileSize);
+
+    file.seekg(0);
+    file.read(buffer.data(), fileSize);
+    file.close();
+
+    return buffer;
+}
+
+void VKSetUp::createGraphicsPipeline()
+{
+    // read SPIR-V shader code. To generate .spv files, go to 
+    // "data/shaders/compile.bat" and double-click it.
+    auto vertShad = readFile("data/shaders/vert.spv");
+    auto fragShad = readFile("data/shaders/frag.spv");
+
+    // create the modules for the vertex and fragment shaders
+    vShadMod = createShaderModule(vertShad);
+    fShadMod = createShaderModule(fragShad);
+
+    // create shader stages to actually use the shaders
+    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageInfo.module = vShadMod;
+    vertShaderStageInfo.pName = "main";
+
+    VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+    fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragShaderStageInfo.module = fShadMod;
+    fragShaderStageInfo.pName = "main";
+
+    // destroy the modules
+    vkDestroyShaderModule(device, vShadMod, nullptr);
+    vkDestroyShaderModule(device, fShadMod, nullptr);
 }
 
 void VKSetUp::cleanup()
