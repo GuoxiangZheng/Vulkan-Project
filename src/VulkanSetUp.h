@@ -39,8 +39,9 @@ public:
 
     void InitWindow(unsigned width, unsigned height);
 
-    std::vector<const char*> getRequiredExtensions(const bool& enableLayer);
-    GLFWwindow* getWindow() const { return window; }
+    std::vector<const char*>    getRequiredExtensions(const bool& enableLayer);
+    GLFWwindow*                 getWindow() const { return window; }
+    VkDevice                    getDevice() const { return device; }
     
     void setupDebugMessenger(const bool& enableLayer);
     void pickPhysicalDevice();
@@ -50,6 +51,11 @@ public:
     void createSwapChain();
     void createImageViews();
     void createGraphicsPipeline();
+    void createCommandPool();
+    void createCommandBuffer();
+    void createSyncObjs();
+
+    void drawFrame();
 
     void destroyDebugMessenger() const;
     void cleanup();
@@ -62,28 +68,57 @@ private:
 
     void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& info);
 
-    VkSurfaceFormatKHR chooseSwapChainSurfaceFormat(const SwapChainSupportDetails& details);
-    VkPresentModeKHR chooseSwapPresentMode(const SwapChainSupportDetails& details);
-    VkExtent2D chooseSwapExtent(const SwapChainSupportDetails& details);
-    VkShaderModule createShaderModule(const std::vector<char>& code);
+    VkSurfaceFormatKHR  chooseSwapChainSurfaceFormat(const SwapChainSupportDetails& details);
+    VkPresentModeKHR    chooseSwapPresentMode(const SwapChainSupportDetails& details);
+    VkExtent2D          chooseSwapExtent(const SwapChainSupportDetails& details);
+    VkShaderModule      createShaderModule(const std::vector<char>& code) const;
 
     SwapChainSupportDetails querySwapChainSupport(const VkPhysicalDevice device) const;
-    QueueFamilyIndices findQueueFamily(const VkPhysicalDevice& device) const;
+    QueueFamilyIndices      findQueueFamily(const VkPhysicalDevice& device) const;
+
+    void recordCommandBuffer(uint32_t imgIdx);
+    void transitionImgLayout(uint32_t imgIdx,
+        VkImageLayout oldLayout,
+        VkImageLayout newLayout,
+        VkAccessFlags2 srcAM,
+        VkAccessFlags2 dstAM,
+        VkPipelineStageFlags2 srcSM,
+        VkPipelineStageFlags2 dstSM);
 
     GLFWwindow* window = nullptr;
-    VkInstance instance{};
-    VkDebugUtilsMessengerEXT debugMessenger{};
-    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    VkPhysicalDeviceFeatures deviceFeatures{};
+    
+    VkInstance instance = nullptr;
+    
+    VkDebugUtilsMessengerEXT debugMessenger = nullptr;
+    
+    VkPhysicalDevice            physicalDevice = VK_NULL_HANDLE;
+    VkPhysicalDeviceFeatures    deviceFeatures{};
+    
     VkDevice device{};
-    VkQueue graphicsQueue{};
-    VkQueue presentQueue{};
-    VkSurfaceKHR surface{};
-    VkSwapchainKHR swapChain{};
+    
+    VkQueue graphicsQueue = nullptr;
+    VkQueue presentQueue = nullptr;
+    
+    VkSurfaceKHR surface = nullptr;
+    
+    VkSwapchainKHR swapChain = nullptr;
+    
     VkExtent2D mExtent{};
-    VkFormat format{};
-    VkShaderModule vShadMod{};
-    VkShaderModule fShadMod{};
-    std::vector<VkImage> swapChainImages;
-    std::vector<VkImageView> SCImageView;
+    VkFormat   mFormat{};
+    
+    VkShaderModule vShadMod = nullptr;
+    VkShaderModule fShadMod = nullptr;
+    
+    VkPipelineLayout    layout           = nullptr;
+    VkPipeline          graphicsPipeline = nullptr;
+
+    VkCommandPool   commandPool     = nullptr;
+    VkCommandBuffer commandBuffer   = nullptr;
+
+    VkSemaphore presentComplete = nullptr;
+    VkSemaphore renderFinished  = nullptr;
+    VkFence     drawFence       = nullptr;
+
+    std::vector<VkImage>        swapChainImages;
+    std::vector<VkImageView>    SCImageView;
 };

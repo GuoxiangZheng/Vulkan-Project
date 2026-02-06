@@ -1,7 +1,7 @@
 #include "VulkanSetUp.h"
 
-const unsigned int WIDTH = 800;
-const unsigned int  HEIGHT = 600;
+int WIDTH  = 800;
+int HEIGHT = 600;
 
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
@@ -47,14 +47,29 @@ void HelloTriangleApplication::initVulkan()
     mSetUp.createLogicalDevice();
     mSetUp.createSwapChain();
     mSetUp.createImageViews();
+    mSetUp.createGraphicsPipeline();
+    mSetUp.createCommandPool();
+    mSetUp.createCommandBuffer();
+    mSetUp.createSyncObjs();
 }
 
 void HelloTriangleApplication::mainLoop()
 {
+    auto window = mSetUp.getWindow();
     while (!glfwWindowShouldClose(mSetUp.getWindow()))
     {
         glfwPollEvents();
+
+        glfwMakeContextCurrent(window);
+        glfwGetFramebufferSize(window, &WIDTH, &HEIGHT);
+
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE))
+            break;
+
+        mSetUp.drawFrame();
     }
+
+    vkDeviceWaitIdle(mSetUp.getDevice());
 }
 
 void HelloTriangleApplication::cleanup()
@@ -67,7 +82,8 @@ void HelloTriangleApplication::cleanup()
 
 #pragma endregion
 
-int main() {
+int main()
+{
     HelloTriangleApplication app;
 
     try {
